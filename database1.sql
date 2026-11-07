@@ -1,0 +1,89 @@
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS FolderEntry (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    FullPath TEXT NOT NULL UNIQUE,
+    FolderName TEXT NOT NULL,
+    ParentFolderId INTEGER NULL,
+    ScannedUtc TEXT NOT NULL,
+    FOREIGN KEY (ParentFolderId) REFERENCES FolderEntry(Id)
+);
+
+CREATE TABLE IF NOT EXISTS FileEntry (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    FullPath TEXT NOT NULL UNIQUE,
+    FileName TEXT NOT NULL,
+    Extension TEXT NOT NULL,
+    SizeBytes INTEGER NOT NULL,
+    CreatedUtc TEXT NULL,
+    ModifiedUtc TEXT NULL,
+    AccessedUtc TEXT NULL,
+    TakenDateUtc TEXT NULL,
+    HashSha256 TEXT NULL,
+    PerceptualHash TEXT NULL,
+    FolderId INTEGER NULL,
+    Width INTEGER NULL,
+    Height INTEGER NULL,
+    IsImage INTEGER NOT NULL DEFAULT 0,
+    IsDeletedOnDisk INTEGER NOT NULL DEFAULT 0,
+    ScannedUtc TEXT NOT NULL,
+    FOREIGN KEY (FolderId) REFERENCES FolderEntry(Id)
+);
+
+CREATE INDEX IF NOT EXISTS IX_FileEntry_FolderId ON FileEntry(FolderId);
+CREATE INDEX IF NOT EXISTS IX_FileEntry_HashSha256 ON FileEntry(HashSha256);
+CREATE INDEX IF NOT EXISTS IX_FileEntry_TakenDateUtc ON FileEntry(TakenDateUtc);
+CREATE INDEX IF NOT EXISTS IX_FileEntry_FileName ON FileEntry(FileName);
+
+CREATE TABLE IF NOT EXISTS DuplicateGroup (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    GroupKey TEXT NOT NULL UNIQUE,
+    CreatedUtc TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS DuplicateMember (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    DuplicateGroupId INTEGER NOT NULL,
+    FileEntryId INTEGER NOT NULL,
+    IsPrimary INTEGER NOT NULL DEFAULT 0,
+    MatchScore REAL NULL,
+    FOREIGN KEY (DuplicateGroupId) REFERENCES DuplicateGroup(Id) ON DELETE CASCADE,
+    FOREIGN KEY (FileEntryId) REFERENCES FileEntry(Id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS IX_DuplicateMember_GroupId ON DuplicateMember(DuplicateGroupId);
+CREATE INDEX IF NOT EXISTS IX_DuplicateMember_FileEntryId ON DuplicateMember(FileEntryId);
+
+CREATE TABLE IF NOT EXISTS Tag (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    Name TEXT NOT NULL UNIQUE,
+    ColorHex TEXT NULL
+);
+
+CREATE TABLE IF NOT EXISTS FileTag (
+    FileEntryId INTEGER NOT NULL,
+    TagId INTEGER NOT NULL,
+    TaggedUtc TEXT NOT NULL,
+    PRIMARY KEY (FileEntryId, TagId),
+    FOREIGN KEY (FileEntryId) REFERENCES FileEntry(Id) ON DELETE CASCADE,
+    FOREIGN KEY (TagId) REFERENCES Tag(Id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS ScanJob (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    RootPath TEXT NOT NULL,
+    Status TEXT NOT NULL,
+    FilesScanned INTEGER NOT NULL DEFAULT 0,
+    ErrorsCount INTEGER NOT NULL DEFAULT 0,
+    StartedUtc TEXT NOT NULL,
+    FinishedUtc TEXT NULL
+);
+
+CREATE TABLE IF NOT EXISTS ScanError (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ScanJobId INTEGER NOT NULL,
+    Path TEXT NOT NULL,
+    ErrorMessage TEXT NOT NULL,
+    OccurredUtc TEXT NOT NULL,
+    FOREIGN KEY (ScanJobId) REFERENCES ScanJob(Id) ON DELETE CASCADE
+);
